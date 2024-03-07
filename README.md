@@ -4,6 +4,7 @@ This bioinformatics pipeline is based on the BCCDC-PHL/ncov2019-artic-nf pipelin
 The bioinformatics pipeline builds a consensus sequence using de novo assembler SPAdes from Illumina paired-end reads. This COI sequence is then used to blast against an in-house curated Ixodes/Dermacentor database (v1.0). Note: Prior to assembly, there are additional steps that remove  any human reads (using a mapping of the reads to a human reference genome), followed by removal of bacterial reads (using Kraken2 and KrakenTools). Any consensus sequences with poor matches (<97% sequence identity) to our in-house database are blast against NCBI database. 
 
 #### Usage
+```
   Usage:
     nextflow run BCCDC-PHL/tick-COI-amplicon-illumina-nf -profile conda --cached ~/.conda/envs --prefix [prefix] [workflow-options]
 
@@ -32,4 +33,4 @@ The bioinformatics pipeline builds a consensus sequence using de novo assembler 
       --length                    Threshold for keeping contigs from denovoAssembly (default:600)
       --subsampleReads            Number of reads to downsample (default: 1000)
       --max_target_seqs_blast     Number of maximum target sequences as output using blast
-
+```
