@@ -32,5 +32,5 @@ The bioinformatics pipeline builds a consensus sequence using de novo assembler 
     Optional:
       --length                    Threshold for keeping contigs from denovoAssembly (default:600)
       --subsampleReads            Number of reads to downsample (default: 1000)
-      --max_target_seqs_blast     Number of maximum target sequences as output using blast
+      --max_target_seqs_blast     Number of maximum target sequences as output using blast (default: 100)
 ```
