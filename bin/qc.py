@@ -249,7 +249,7 @@ def check_status(amplicon_size, extract_pident):
         elif extract_pident <97:
             return 'REVIEW'
     else:
-        return 'FAIL/REVIEW'
+        return 'QC_FAIL/REVIEW'
 
 def extract_contig_sequences(consensus):
     # Parse the assembly file
