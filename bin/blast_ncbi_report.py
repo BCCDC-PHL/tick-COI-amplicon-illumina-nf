@@ -13,8 +13,9 @@ def get_first_data_line(report,output_file,samplename,output_prefix):
         df_data_line.insert(0, 'run_id', output_prefix)
         df_data_line.insert(1, 'sample_id', samplename)
         df_data_line_reads = float(df_data_line['pident'].item())
-        df_data_line['check_metrics'] = 'PASS' if df_data_line_reads >= 97 else 'FAIL/REVIEW'
-
+        df_data_line_qend = df_data_line['qend']
+        df_data_line['amplicon_size'] = df_data_line_qend
+        df_data_line['check_metrics'] = 'PASS' if df_data_line_reads >= 97 else 'QC_FAIL/REVIEW'
         final_df_data_line_csv = df_data_line.to_csv(output_file, header = True, index=False)
 
     else:
