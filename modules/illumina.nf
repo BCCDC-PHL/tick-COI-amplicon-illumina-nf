@@ -5,15 +5,25 @@ process performHostFilter {
     label 'largecpu'
 
     publishDir "${params.outdir}/${task.process.replaceAll(":","_")}", pattern: "${sampleName}_hostfiltered_R*.fastq.gz", mode: 'copy'
+    publishDir "${params.outdir}/${task.process.replaceAll(":","_")}", pattern: "${sampleName}_performHostFilter_provenance.yml", mode: 'copy'
 
     input:
     tuple val(sampleName), path(forward), path(reverse)
 
     output:
     tuple val(sampleName), path("${sampleName}_hostfiltered_R1.fastq.gz"), path("${sampleName}_hostfiltered_R2.fastq.gz"), emit: fastqPairs
+    tuple val(sampleName), path("${sampleName}_performHostFilter_provenance.yml"), emit: provenance
 
     script:
     """
+    printf -- "- process_name: performHostFilter\\n"                                           >> ${sampleName}_performHostFilter_provenance.yml
+    printf -- "  tools:\\n"                                                                    >> ${sampleName}_performHostFilter_provenance.yml
+    printf -- "    - tool_name: bwa mem\\n"                                                    >> ${sampleName}_performHostFilter_provenance.yml
+    printf -- "      tool_version: \$(bwa 2>&1 | grep "Version: " | cut -d ' ' -f 2)\\n"       >> ${sampleName}_performHostFilter_provenance.yml
+    printf -- "      parameters:\\n"                                                           >> ${sampleName}_performHostFilter_provenance.yml
+    printf -- "        - parameter: -t\\n"                                                   >> ${sampleName}_performHostFilter_provenance.yml
+    printf -- "          value: ${task.cpus}\\n"                                             >> ${sampleName}_performHostFilter_provenance.yml
+
     bwa mem -t ${task.cpus} ${params.composite_ref} ${forward} ${reverse} | \
       filter_non_human_reads.py -c ${params.viral_contig_name} > ${sampleName}.viral_and_nonmapping_reads.bam
     samtools sort -@ ${task.cpus} -n ${sampleName}.viral_and_nonmapping_reads.bam | \
@@ -32,6 +42,7 @@ process readTrimming {
     errorStrategy 'ignore'
 
     publishDir "${params.outdir}/${task.process.replaceAll(":","_")}", pattern: '*_val_{1,2}.fq.gz', mode: 'copy'
+    publishDir "${params.outdir}/${task.process.replaceAll(":","_")}", pattern: "${sampleName}_readTrimming*", mode: 'copy'
 
     cpus 1
 
@@ -40,9 +51,15 @@ process readTrimming {
 
     output:
     tuple val(sampleName), path("*_val_1.fq.gz"), path("*_val_2.fq.gz"), optional: true, emit: trimmedReads
+    tuple val(sampleName), path("${sampleName}_readTrimming_provenance.yml"), emit: provenance
 
     script:
     """
+    printf -- "- process_name: readTrimming\\n"                                                                     >> ${sampleName}_readTrimming_provenance.yml
+    printf -- "  tools:\\n"                                                                                         >> ${sampleName}_readTrimming_provenance.yml
+    printf -- "    - tool_name: trim_galore\\n"                                                                     >> ${sampleName}_readTrimming_provenance.yml
+    printf -- "      tool_version: \$(trim_galore --version | sed -n '4p' | sed 's/version //' | tr -d '[:space:]')\\n"                 >> ${sampleName}_readTrimming_provenance.yml
+
     trim_galore --paired $forward $reverse
     """
 }
@@ -79,6 +96,8 @@ process kraken2Reports {
     errorStrategy 'ignore'
 
     publishDir "${params.outdir}/${task.process.replaceAll(":","_")}/${sampleName}", pattern: "${sampleName}_kraken2_report.txt", mode: 'copy'
+    publishDir "${params.outdir}/${task.process.replaceAll(":","_")}/${sampleName}", pattern: "${sampleName}_kraken2Reports*", mode: 'copy'
+
 
     input:
     tuple val(sampleName), path(forward), path(reverse), path(kraken2_db)
@@ -86,9 +105,21 @@ process kraken2Reports {
     output:
     path("${sampleName}_kraken2_report.txt")
     tuple val(sampleName), path("${sampleName}_kraken2_output.tsv"), path("${sampleName}_kraken2_report.txt"), optional:true, emit: report
+    tuple val(sampleName), path("${sampleName}_kraken2Reports_provenance.yml"), emit: provenance
+
 
     script:
-    """    
+    """
+    printf -- "- process_name: kraken2Reports\\n"                                              >> ${sampleName}_kraken2Reports_provenance.yml
+    printf -- "  tools:\\n"                                                                    >> ${sampleName}_kraken2Reports_provenance.yml
+    printf -- "    - tool_name: kraken2\\n"                                                    >> ${sampleName}_kraken2Reports_provenance.yml
+    printf -- "      tool_version: \$(kraken2 --version | cut -d ' ' -f 3 | head -n 1)\\n"     >> ${sampleName}_kraken2Reports_provenance.yml
+    printf -- "      parameters:\\n"                                                           >> ${sampleName}_kraken2Reports_provenance.yml
+    printf -- "        - parameter: --db\\n"                                               >> ${sampleName}_kraken2Reports_provenance.yml
+    printf -- "          value: \$(readlink ${kraken2_db})\\n"                                 >> ${sampleName}_kraken2Reports_provenance.yml
+    printf -- "        - parameter: --threads\\n"                                                   >> ${sampleName}_kraken2Reports_provenance.yml
+    printf -- "          value: ${task.cpus}\\n"                                               >> ${sampleName}_kraken2Reports_provenance.yml
+    
     kraken2 \
       --db ${kraken2_db} \
       --threads ${task.cpus} \
@@ -106,6 +137,7 @@ process removeBacterialReads {
     errorStrategy 'ignore'
 
     publishDir "${params.outdir}/coiIllumina_sequenceAnalysis_kraken2Reports/${sampleName}", pattern: "kraken2_report_summary.csv", mode: 'copy'
+    publishDir "${params.outdir}/coiIllumina_sequenceAnalysis_kraken2Reports/${sampleName}", pattern: "${sampleName}_removeBacterialReads_provenance.yml", mode: 'copy'
 
     cpus 1
 
@@ -115,9 +147,20 @@ process removeBacterialReads {
     output:
     tuple val(sampleName), path("${sampleName}_hostfiltered_R1_val_1_posttrim_filter_unclassified.fq.gz"), path("${sampleName}_hostfiltered_R2_val_2_posttrim_filter_unclassified.fq.gz"), emit: filtered
     path("kraken2_report_summary.csv"), emit: kraken2_report
+    tuple val(sampleName), path("${sampleName}_removeBacterialReads_provenance.yml"), emit: provenance
 
     script:
     """
+    printf -- "- process_name: removeBacterialReads\\n"                                        >> ${sampleName}_removeBacterialReads_provenance.yml
+    printf -- "  tools:\\n"                                                                    >> ${sampleName}_removeBacterialReads_provenance.yml
+    printf -- "    - tool_name: extract_kraken_reads.py\\n"                                    >> ${sampleName}_removeBacterialReads_provenance.yml
+    printf -- "      parameters:\\n"                                                           >> ${sampleName}_removeBacterialReads_provenance.yml
+    printf -- "        - parameter: --taxid\\n"                                                  >> ${sampleName}_removeBacterialReads_provenance.yml
+    printf -- "          value: 2\\n"                                                          >> ${sampleName}_removeBacterialReads_provenance.yml
+    printf -- "        - parameter: --exclude\\n"                                                >> ${sampleName}_removeBacterialReads_provenance.yml
+    printf -- "        - parameter: --include-children\\n"                                       >> ${sampleName}_removeBacterialReads_provenance.yml
+    printf -- "        - parameter: --fastq-output\\n"                                           >> ${sampleName}_removeBacterialReads_provenance.yml
+
     extract_kraken_reads.py \
       -k ${kraken2_output} \
       -r ${kraken2_report} \
@@ -147,15 +190,28 @@ process subsample {
     errorStrategy 'ignore'
 
     publishDir "${params.outdir}/${task.process.replaceAll(":","_")}", pattern: '*subsampled.fastq.gz', mode: 'copy'
+    publishDir "${params.outdir}/${task.process.replaceAll(":","_")}", pattern: "${sampleName}_subsample_provenance.yml", mode: 'copy'
 
     input:
     tuple val(sampleName), path(forward), path(reverse)
 
     output:
-    tuple val(sampleName), path("${sampleName}.R1.subsampled.fastq.gz"), path("${sampleName}.R2.subsampled.fastq.gz")
+    tuple val(sampleName), path("${sampleName}.R1.subsampled.fastq.gz"), path("${sampleName}.R2.subsampled.fastq.gz"), emit: subsample_out
+    tuple val(sampleName), path("${sampleName}_subsample_provenance.yml"), emit: provenance
+
 
     script:
     """
+    printf -- "- process_name: subsample\\n"                                                   >> ${sampleName}_subsample_provenance.yml
+    printf -- "  tools:\\n"                                                                    >> ${sampleName}_subsample_provenance.yml
+    printf -- "    - tool_name: rasusa\\n"                                                     >> ${sampleName}_subsample_provenance.yml
+    printf -- "      tool_version: \$(rasusa --version | sed 's/rasusa //')\\n"                >> ${sampleName}_subsample_provenance.yml
+    printf -- "      parameters:\\n"                                                           >> ${sampleName}_subsample_provenance.yml
+    printf -- "        - parameter: --num\\n"                                                    >> ${sampleName}_subsample_provenance.yml
+    printf -- "          value: ${params.subsampleReads}\\n"                                   >> ${sampleName}_subsample_provenance.yml
+    printf -- "        - parameter: --seed\\n"                                                   >> ${sampleName}_subsample_provenance.yml
+    printf -- "          value: 42\\n"                                                         >> ${sampleName}_subsample_provenance.yml
+
     rasusa --seed 42 --num ${params.subsampleReads} -i ${forward} -i ${reverse} -o ${sampleName}.R1.subsampled.fastq.gz -o ${sampleName}.R2.subsampled.fastq.gz
     """
 
@@ -173,7 +229,7 @@ process denovoAssembly {
     publishDir "${params.outdir}/${task.process.replaceAll(":","_")}/${sampleName}", pattern: 'results*', mode: 'copy'
     publishDir "${params.outdir}/${task.process.replaceAll(":","_")}/${sampleName}", pattern: '*.fasta', mode: 'copy'
     publishDir "${params.outdir}/${task.process.replaceAll(":","_")}/${sampleName}", pattern: '*.json', mode: 'copy'
-
+    publishDir "${params.outdir}/${task.process.replaceAll(":","_")}/${sampleName}", pattern: "${sampleName}_denovoAssembly_provenance.yml", mode: 'copy'
 
     input:
     tuple val(sampleName), path(forward), path(reverse)
@@ -183,9 +239,20 @@ process denovoAssembly {
     path("*.fasta")
     path("*.json")
     tuple val(sampleName), path("${sampleName}_*_filtered.fasta"), optional: true,  emit: scaffolds
+    tuple val(sampleName), path("${sampleName}_denovoAssembly_provenance.yml"), emit: provenance
+
 
     script:
     """
+    printf -- "- process_name: denovoAssembly\\n"                                              >> ${sampleName}_denovoAssembly_provenance.yml
+    printf -- "  tools:\\n"                                                                    >> ${sampleName}_denovoAssembly_provenance.yml
+    printf -- "    - tool_name: spades.py\\n"                                                  >> ${sampleName}_denovoAssembly_provenance.yml
+    printf -- "      tool_version: \$(spades.py --version | cut -d ' ' -f 4)\\n"               >> ${sampleName}_denovoAssembly_provenance.yml
+    printf -- "      parameters:\\n"                                                           >> ${sampleName}_denovoAssembly_provenance.yml
+    printf -- "        - parameter: -t\\n"                                                   >> ${sampleName}_denovoAssembly_provenance.yml
+    printf -- "          value: ${task.cpus}\\n"                                               >> ${sampleName}_denovoAssembly_provenance.yml
+    printf -- "        - parameter: --isolate\\n"                                                >> ${sampleName}_denovoAssembly_provenance.yml
+
     spades.py -1 ${forward} -2 ${reverse} -o results/${sampleName}/ -t ${task.cpus}
 
         if [ -e results/${sampleName}/scaffolds.fasta ]; then
@@ -225,6 +292,7 @@ process alignConsensusToReference {
 
     publishDir "${params.outdir}/${task.process.replaceAll(":","_")}/${sampleName}", pattern: "${sampleName}.with_ref.alignment.fa", mode: 'copy'
     publishDir "${params.outdir}/${task.process.replaceAll(":","_")}/consensus", pattern: "${sampleName}.consensus.fasta", mode: 'copy'
+    publishDir "${params.outdir}/${task.process.replaceAll(":","_")}/${sampleName}", pattern: "${sampleName}_alignConsensusToReference_provenance.yml", mode: 'copy'
 
     input:
     tuple val(sampleName), path(consensus), path(reference)
@@ -232,9 +300,21 @@ process alignConsensusToReference {
     output:
     tuple val(sampleName), path("${sampleName}.with_ref.alignment.fa")
     tuple val(sampleName), path("${sampleName}.consensus.fasta"), emit: consensus
+    tuple val(sampleName), path("${sampleName}_alignConsensusToReference_provenance.yml"), emit: provenance
 
     script:
     """
+    printf -- "- process_name: alignConsensusToReference\\n"                                   >> ${sampleName}_alignConsensusToReference_provenance.yml
+    printf -- "  tools:\\n"                                                                    >> ${sampleName}_alignConsensusToReference_provenance.yml
+    printf -- "    - tool_name: mafft\\n"                                                      >> ${sampleName}_alignConsensusToReference_provenance.yml
+    printf -- "      tool_version: \$(mafft --version 2>&1)\\n"                                     >> ${sampleName}_alignConsensusToReference_provenance.yml
+    printf -- "      parameters:\\n"                                                           >> ${sampleName}_alignConsensusToReference_provenance.yml
+    printf -- "        - parameter: --adjustdirectionaccurately\\n"                              >> ${sampleName}_alignConsensusToReference_provenance.yml
+    printf -- "        - parameter: --preservecase\\n"                                           >> ${sampleName}_alignConsensusToReference_provenance.yml
+    printf -- "        - parameter: --keeplength\\n"                                             >> ${sampleName}_alignConsensusToReference_provenance.yml
+    printf -- "        - parameter: --add\\n"                                                    >> ${sampleName}_alignConsensusToReference_provenance.yml
+    printf -- "          value: \$(readlink ${reference})\\n"                                  >> ${sampleName}_alignConsensusToReference_provenance.yml
+
     mafft \
       --adjustdirectionaccurately \
       --preservecase \
@@ -255,15 +335,30 @@ process blastSpeciesID {
     tag { sampleName }
 
     publishDir "${params.outdir}/${task.process.replaceAll(":","_")}", pattern: "${sampleName}_blastn.csv", mode: 'copy'
+    publishDir "${params.outdir}/${task.process.replaceAll(":","_")}", pattern: "${sampleName}_blastSpeciesID_provenance.yml", mode: 'copy'
     
     input:
     tuple val(sampleName), path(consensus), path(blastndb)
 
     output:
     tuple val(sampleName), path("${sampleName}_blastn.csv"), emit: blastn
+    tuple val(sampleName), path("${sampleName}_blastSpeciesID_provenance.yml"), emit: provenance
 
     script:
     """
+    printf -- "- process_name: blastSpeciesID\\n"                                                 >> ${sampleName}_blastSpeciesID_provenance.yml
+    printf -- "  tools:\\n"                                                                       >> ${sampleName}_blastSpeciesID_provenance.yml
+    printf -- "    - tool_name: blastn\\n"                                                        >> ${sampleName}_blastSpeciesID_provenance.yml
+    printf -- "      tool_version: \$(blastn -version | cut -d ' ' -f 2 | head -n 1)\\n"          >> ${sampleName}_blastSpeciesID_provenance.yml
+    printf -- "      parameters:\\n"                                                              >> ${sampleName}_blastSpeciesID_provenance.yml
+    printf -- "        - parameter: -db\\n"                                                        >> ${sampleName}_blastSpeciesID_provenance.yml
+    printf -- "          value: \$(readlink ${blastndb})\\n"                                      >> ${sampleName}_blastSpeciesID_provenance.yml
+    printf -- "          sha256: \$(shasum -a 256 ${blastndb}/*.fasta | cut -d ' ' -f 1)\\n"              >> ${sampleName}_blastSpeciesID_provenance.yml
+    printf -- "        - parameter: -outfmt\\n"                                                    >> ${sampleName}_blastSpeciesID_provenance.yml
+    printf -- "          value: 10 qseqid,sseqid,pident,length,mismatch,gapopen,qstart,qend,sstart,send,evalue,bitscore\\n"     >> ${sampleName}_blastSpeciesID_provenance.yml
+    printf -- "        - parameter: -max_target_seqs\\n"                                           >> ${sampleName}_blastSpeciesID_provenance.yml
+    printf -- "          value: ${params.max_target_seqs_blast}\\n"                               >> ${sampleName}_blastSpeciesID_provenance.yml
+
     grep "^>" ${consensus} > ${sampleName}_consensus_temp.fa && \
     grep -v "^>" ${consensus} | tr -d "-" | tr -d "\n" | fold -w 70 >> ${sampleName}_consensus_temp.fa
 
@@ -298,9 +393,17 @@ process indexReferences {
 
     output:
     tuple val(sampleName), path("${ref}.fa"), path("${ref}.fa.*"), emit: indexed_ref
+    tuple val(sampleName), path("${sampleName}_indexReferences_provenance.yml"), emit: provenance
 
     script:
     """
+    printf -- "- process_name: indexReferences\\n"                                                 >> ${sampleName}_indexReferences_provenance.yml
+    printf -- "  tools:\\n"                                                                        >> ${sampleName}_indexReferences_provenance.yml
+    printf -- "    - tool_name: bwa\\n"                                                            >> ${sampleName}_indexReferences_provenance.yml
+    printf -- "      tool_version: \$(bwa 2>&1 | grep "Version: " | cut -d ' ' -f 2)\\n"           >> ${sampleName}_indexReferences_provenance.yml
+    printf -- "      parameters:\\n"                                                               >> ${sampleName}_indexReferences_provenance.yml
+    printf -- "        - parameter: index\\n"                                                      >> ${sampleName}_indexReferences_provenance.yml
+
     ln -s ${ref} ${ref}.fa
     bwa index ${ref}.fa
     """
@@ -319,15 +422,29 @@ process readMapping {
     label 'largecpu'
 
     publishDir "${params.outdir}/${task.process.replaceAll(":","_")}/${sampleName}", pattern: "${sampleName}.sorted{.bam,.bam.bai}", mode: 'copy'
+    publishDir "${params.outdir}/${task.process.replaceAll(":","_")}/${sampleName}", pattern: "${sampleName}_readMapping_provenance.yml", mode: 'copy'
 
     input:
     tuple val(sampleName), path(forward), path(reverse), path(ref), path("*")
 
     output:
     tuple val(sampleName), path("${sampleName}.sorted.bam"), path("${sampleName}.sorted.bam.bai"), emit: bamfiles
+    tuple val(sampleName), path("${sampleName}_readMapping_provenance.yml"), emit: provenance
 
     script:
     """
+    printf -- "- process_name: readMapping\\n"                                                     >> ${sampleName}_readMapping_provenance.yml
+    printf -- "  tools:\\n"                                                                        >> ${sampleName}_readMapping_provenance.yml
+    printf -- "    - tool_name: bwa\\n"                                                            >> ${sampleName}_readMapping_provenance.yml
+    printf -- "      tool_version: \$(bwa 2>&1 | grep "Version: " | cut -d ' ' -f 2)\\n"           >> ${sampleName}_readMapping_provenance.yml
+    printf -- "      parameters:\\n"                                                               >> ${sampleName}_readMapping_provenance.yml
+    printf -- "        - parameter: mem\\n"                                                        >> ${sampleName}_readMapping_provenance.yml
+    printf -- "    - tool_name: samtools\\n"                                                       >> ${sampleName}_readMapping_provenance.yml
+    printf -- "      tool_version: \$(samtools 2>&1 | grep "Version: " | cut -d ' ' -f 2)\\n"      >> ${sampleName}_readMapping_provenance.yml
+    printf -- "      parameters:\\n"                                                               >> ${sampleName}_readMapping_provenance.yml
+    printf -- "        - parameter: sort\\n"                                                       >> ${sampleName}_readMapping_provenance.yml
+    printf -- "        - parameter: index\\n"                                                      >> ${sampleName}_readMapping_provenance.yml
+
     bwa mem -t ${task.cpus} ${ref} ${forward} ${reverse} | \
     samtools sort -o ${sampleName}.sorted.bam
     samtools index ${sampleName}.sorted.bam
@@ -362,15 +479,30 @@ process ncbiBlast {
     tag { sampleName }
 
     publishDir "${params.outdir}/${task.process.replaceAll(":","_")}", pattern: "${sampleName}_blastn.tsv", mode: 'copy'
+    publishDir "${params.outdir}/${task.process.replaceAll(":","_")}", pattern: "${sampleName}_ncbiBlast_provenance.yml", mode: 'copy'
 
     input:
     tuple val(sampleName), path(consensus)
 
     output:
     tuple val(sampleName), path("${sampleName}_blastn.tsv"), emit: blast_ncbi
+    tuple val(sampleName), path("${sampleName}_ncbiBlast_provenance.yml"), emit: provenance
+
 
     script:
     """
+    printf -- "- process_name: ncbiBlast\\n"                                                      >> ${sampleName}_ncbiBlast_provenance.yml
+    printf -- "  tools:\\n"                                                                       >> ${sampleName}_ncbiBlast_provenance.yml
+    printf -- "    - tool_name: blastn\\n"                                                        >> ${sampleName}_ncbiBlast_provenance.yml
+    printf -- "      tool_version: \$(blastn -version | cut -d ' ' -f 2 | head -n 1)\\n"          >> ${sampleName}_ncbiBlast_provenance.yml
+    printf -- "      parameters:\\n"                                                              >> ${sampleName}_ncbiBlast_provenance.yml
+    printf -- "        - parameter: -db\\n"                                                        >> ${sampleName}_ncbiBlast_provenance.yml
+    printf -- "          value: \$(readlink ${params.ncbi_db})\\n"                                >> ${sampleName}_ncbiBlast_provenance.yml
+    printf -- "        - parameter: -outfmt\\n"                                                    >> ${sampleName}_ncbiBlast_provenance.yml
+    printf -- "          value: 6 qseqid staxids sseqid sscinames scomnames pident length mismatch gapopen qstart qend sstart send evalue bitscore\\n"     >> ${sampleName}_ncbiBlast_provenance.yml
+    printf -- "        - parameter: -max_target_seqs\\n"                                           >> ${sampleName}_ncbiBlast_provenance.yml
+    printf -- "          value: ${params.max_target_seqs_blast}\\n"                               >> ${sampleName}_ncbiBlast_provenance.yml
+
     grep "^>" ${consensus} > ${sampleName}_consensus_temp.fa && \
     grep -v "^>" ${consensus} | tr -d "-" | tr -d "\n" | fold -w 70 >> ${sampleName}_consensus_temp.fa
 
