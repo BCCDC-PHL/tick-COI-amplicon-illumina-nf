@@ -20,6 +20,9 @@ include { writeTopHitsCSV }   from '../modules/qc.nf'
 include { extractSampleIDs  } from '../modules/illumina.nf'
 include { ncbiBlast  } from '../modules/illumina.nf'
 include { reportNCBI } from '../modules/qc.nf'
+include { pipeline_provenance } from '../modules/provenance.nf'
+include { collect_provenance  } from '../modules/provenance.nf'
+
 
 workflow prepareReferenceFiles {
 
@@ -112,7 +115,7 @@ workflow sequenceAnalysis {
 
       subsample(removeBacterialReads.out.filtered)
 
-      denovoAssembly(subsample.out)
+      denovoAssembly(subsample.out.subsample_out)
 
       alignConsensusToReference(denovoAssembly.out.scaffolds.combine(ch_refFasta))
 
@@ -128,7 +131,7 @@ workflow sequenceAnalysis {
 
       indexReferences(alignConsensusToReference.out.consensus)
 
-      readMapping(subsample.out.join(indexReferences.out.indexed_ref))
+      readMapping(subsample.out.subsample_out.join(indexReferences.out.indexed_ref))
 
       makeQCCSV(readMapping.out.bamfiles.join(alignConsensusToReference.out.consensus, by: 0)
                                    .combine(ch_refFasta_primers)
@@ -155,6 +158,32 @@ workflow sequenceAnalysis {
       reportNCBI(ncbiBlast.out.blast_ncbi)
       
       reportNCBI.out.ncbi_topHits.collectFile(keepHeader: true, sort: { it.text }, name: "${params.prefix}_top_hits_blastn_ncbi.csv", storeDir: "${params.outdir}")
+
+      // Provenance collection processes
+      // The basic idea is to build up a channel with the following structure:
+      // [sample_id, [provenance_file_1.yml, provenance_file_2.yml, provenance_file_3.yml...]]
+      // ...and then concatenate them all together in the 'collect_provenance' process.
+      ch_start_time = Channel.of(workflow.start)
+      ch_pipeline_name = Channel.of(workflow.manifest.name)
+      ch_pipeline_version = Channel.of(workflow.revision)
+      ch_pipeline_provenance = pipeline_provenance(ch_pipeline_name.combine(ch_pipeline_version).combine(ch_start_time))
+
+      performHostFilter.out.provenance
+          .set { ch_provenance }
+      ch_provenance = ch_provenance.join(readTrimming.out.provenance).map{ it ->              [it[0], [it[1]] << it[2]] }
+      ch_provenance = ch_provenance.join(kraken2Reports.out.provenance).map{ it ->            [it[0], it[1] << it[2]] }
+      ch_provenance = ch_provenance.join(removeBacterialReads.out.provenance).map{ it ->      [it[0], it[1] << it[2]] }
+      ch_provenance = ch_provenance.join(subsample.out.provenance).map{ it ->                 [it[0], it[1] << it[2]] }
+      ch_provenance = ch_provenance.join(denovoAssembly.out.provenance).map{ it ->            [it[0], it[1] << it[2]] }
+      ch_provenance = ch_provenance.join(alignConsensusToReference.out.provenance).map{ it -> [it[0], it[1] << it[2]] }
+      ch_provenance = ch_provenance.join(blastSpeciesID.out.provenance).map{ it ->            [it[0], it[1] << it[2]] }
+      ch_provenance = ch_provenance.join(indexReferences.out.provenance).map{ it ->           [it[0], it[1] << it[2]] }
+      ch_provenance = ch_provenance.join(readMapping.out.provenance).map{ it ->               [it[0], it[1] << it[2]] }
+      //ch_provenance = ch_provenance.join(ncbiBlast.out.provenance).map{ it ->                 [it[0], it[1] << it[2]] }
+      ch_provenance = ch_provenance.join(ch_provenance.map{ it -> it[0] }.combine(ch_pipeline_provenance)).map{ it -> [it[0], it[1] << it[2]] }
+
+      collect_provenance(ch_provenance)
+
 
 }
 
