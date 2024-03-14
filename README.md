@@ -3,6 +3,40 @@ This bioinformatics pipeline is based on the BCCDC-PHL/ncov2019-artic-nf pipelin
 
 The bioinformatics pipeline builds a consensus sequence using de novo assembler SPAdes from Illumina paired-end reads. This COI sequence is then used to blast against an in-house curated Ixodes/Dermacentor database (v1.0). Note: Prior to assembly, there are additional steps that remove  any human reads (using a mapping of the reads to a human reference genome), followed by removal of bacterial reads (using Kraken2 and KrakenTools). Any consensus sequences with poor matches (<97% sequence identity) to our in-house database are blast against NCBI database. 
 
+```mermaid
+flowchart TD
+  composite_ref[composite_ref.fa]
+  fastq[fastq_dir]
+  fastq --> performHostFilter
+  composite_ref --> performHostFilter
+  performHostFilter(performHostFilter) --> readTrimming(readTrimming)
+  readTrimming(readTrimming) --> filterResidualAdapters(filterResidualAdapters)
+  filterResidualAdapters --> kraken2Reports
+  ch_kraken_db --> kraken2Reports
+  kraken2Reports --> removeBacterialReads
+  removeBacterialReads --> subsample
+  subsample --> denovoAssembly
+  subsample --> readMapping
+  indexReferences --> readMapping
+  alignConsensusToReference --> readMapping
+  readMapping --> makeQCCSV
+  ch_refFasta_primers --> makeQCCSV
+  ch_bedFile --> makeQCCSV
+  ch_primerPairs --> makeQCCSV
+  compileTopHits --> makeQCCSV
+  denovoAssembly --> alignConsensusToReference
+  ch_refFasta --> alignConsensusToReference
+  alignConsensusToReference --> blastSpeciesID
+  ch_blastndb --> blastSpeciesID
+  blastSpeciesID --> compileTopHits
+  compileTopHits --> writeTopHitsCSV
+  makeQCCSV --> writeQCSummaryCSV
+  writeQCSummaryCSV --> extractSampleIDs
+  extractSampleIDs --> ncbiBlast
+  ncbi_db --> ncbiBlast
+  ncbiBlast --> reportNCBI
+```
+
 #### Usage
 ```
   Usage:
