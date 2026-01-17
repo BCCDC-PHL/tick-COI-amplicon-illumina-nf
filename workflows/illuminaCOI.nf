@@ -2,6 +2,7 @@
 
 nextflow.enable.dsl = 2
 
+include { fastp }                     from '../modules/illumina.nf'
 include { performHostFilter }         from '../modules/illumina.nf'
 include { readTrimming }              from '../modules/illumina.nf'
 include { filterResidualAdapters }    from '../modules/illumina.nf'
@@ -103,7 +104,9 @@ workflow sequenceAnalysis {
 
     main:
 
-      performHostFilter(ch_filePairs)
+      fastp(ch_filePairs)
+
+      performHostFilter(fastp.out.fastp_trimmed_reads)
 
       readTrimming(performHostFilter.out.fastqPairs)
 
@@ -168,9 +171,10 @@ workflow sequenceAnalysis {
       ch_pipeline_version = Channel.of(workflow.revision)
       ch_pipeline_provenance = pipeline_provenance(ch_pipeline_name.combine(ch_pipeline_version).combine(ch_start_time))
 
-      performHostFilter.out.provenance
+      fastp.out.provenance
           .set { ch_provenance }
-      ch_provenance = ch_provenance.join(readTrimming.out.provenance).map{ it ->              [it[0], [it[1]] << it[2]] }
+      ch_provenance = ch_provenance.join(performHostFilter.out.provenance).map{ it ->         [it[0], [it[1]] << it[2]] }
+      ch_provenance = ch_provenance.join(readTrimming.out.provenance).map{ it ->              [it[0], it[1] << it[2]] }
       ch_provenance = ch_provenance.join(kraken2Reports.out.provenance).map{ it ->            [it[0], it[1] << it[2]] }
       ch_provenance = ch_provenance.join(removeBacterialReads.out.provenance).map{ it ->      [it[0], it[1] << it[2]] }
       ch_provenance = ch_provenance.join(subsample.out.provenance).map{ it ->                 [it[0], it[1] << it[2]] }

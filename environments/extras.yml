@@ -2,12 +2,11 @@ name: extras
 channels:
   - conda-forge
   - bioconda
-  - defaults
 dependencies:
   - biopython
   - matplotlib
   - pandas
   - samtools
   - libxcb
-  - rasusa
+  - rasusa=0.7.0
   - spades

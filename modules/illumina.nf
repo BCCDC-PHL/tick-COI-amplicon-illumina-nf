@@ -1,3 +1,38 @@
+process fastp {
+
+    tag { sampleName }
+    
+    publishDir "${params.outdir}/${task.process.replaceAll(":","_")}", pattern: "${sampleName}_fastp.json", mode: 'copy'
+
+    input:
+    tuple val(sampleName), path(forward), path(reverse)
+
+    output:
+    tuple val(sampleName), path("${sampleName}_fastp.{json,html}"), emit: json
+    tuple val(sampleName), path("${sampleName}_trimmed_R1.fastq.gz"), path("${sampleName}_trimmed_R2.fastq.gz"), emit: fastp_trimmed_reads
+    tuple val(sampleName), path("${sampleName}_fastp_provenance.yml"), emit: provenance
+
+    script:
+    """
+    printf -- "- process_name: fastp\\n"  >> ${sampleName}_fastp_provenance.yml
+    printf -- "  tools:\\n"               >> ${sampleName}_fastp_provenance.yml
+    printf -- "    - tool_name: fastp\\n" >> ${sampleName}_fastp_provenance.yml
+    printf -- "      tool_version: \$(fastp --version 2>&1 | cut -d ' ' -f 2)\\n" >> ${sampleName}_fastp_provenance.yml
+    
+    fastp \
+    --cut_tail \
+    --trim_poly_g \
+	-i ${forward} \
+	-I ${reverse} \
+    --detect_adapter_for_pe \
+	-o ${sampleName}_trimmed_R1.fastq.gz \
+	-O ${sampleName}_trimmed_R2.fastq.gz \
+    --json ${sampleName}_fastp.json \
+    --html ${sampleName}_fastp.html
+        
+    """
+}
+
 process performHostFilter {
 
     tag { sampleName }
