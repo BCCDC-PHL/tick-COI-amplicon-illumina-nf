@@ -1,4 +1,4 @@
-name: blast
+name: tick-coi-blast
 channels:
  - conda-forge
  - bioconda

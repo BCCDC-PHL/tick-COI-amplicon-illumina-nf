@@ -1,4 +1,4 @@
-name: extras
+name: tick-coi-extras
 channels:
   - conda-forge
   - bioconda
