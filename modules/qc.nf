@@ -1,5 +1,6 @@
 process makeQCCSV {
     tag { sampleName }
+    errorStrategy 'ignore'
 
     cpus 4
 
@@ -106,6 +107,7 @@ process failedSummary {
     /** Provides a list of all the failed samples and the reasons for failing them **/
 
     tag { sampleName }
+    errorStrategy 'ignore'
 
     publishDir "${params.outdir}/", pattern: "${params.prefix}.summary.COI.failed.csv", mode: 'copy'
 
